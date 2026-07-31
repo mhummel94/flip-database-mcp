@@ -118,6 +118,7 @@ function registerTools(server: McpServer) {
     {
       city: z.string().optional().describe('Filter by city name'),
       zip: z.string().optional().describe('Filter by ZIP code'),
+      propertyType: z.string().optional().describe("Filter by property type, e.g. 'SFR' or 'CND' — omit to include all types"),
       sinceDate: z.string().optional().describe('Only include sales on/after this date (YYYY-MM-DD)'),
     },
     async (filters) => {
