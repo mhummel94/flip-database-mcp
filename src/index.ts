@@ -71,6 +71,8 @@ function registerTools(server: McpServer) {
       maxDaysHeld: z.number().optional().describe('Maximum days between prior and latest sale'),
       minLatestPrice: z.number().optional().describe('Minimum latest sale price'),
       maxLatestPrice: z.number().optional().describe('Maximum latest sale price'),
+      maxDaysOnMarket: z.number().optional().describe('Maximum days on market (listed to closed, includes escrow)'),
+      minListToSoldRatio: z.number().optional().describe('Minimum list-to-sold ratio as a decimal, e.g. 0.98 = sold at 98% of highest list price'),
       limit: z.number().optional().describe('Max results to return (default 25)'),
     },
     async (filters) => {
@@ -141,13 +143,13 @@ function registerTools(server: McpServer) {
   // Read-only, SELECT-only access for open-ended statistical questions that
   // the other 3 tools can't answer (correlations, threshold/bucket analysis,
   // multi-dimensional grouping). Runs against a dedicated `flip_readonly`
-  // Postgres role with ONLY SELECT on `properties` — no write access
+  // Postgres role with ONLY SELECT on `properties` and `mls_listings` — no write access
   // anywhere, enforced at the database level, not just in this code.
   server.tool(
     'run_sql_query',
     {
       query: z.string().describe(
-        'A single read-only SQL SELECT statement (Postgres syntax) to run against the `properties` table. ' +
+        'A single read-only SQL SELECT statement (Postgres syntax) against the `properties` and `mls_listings` tables. ' +
         'Only SELECT is allowed — no INSERT/UPDATE/DELETE, no multiple statements. ' +
         'A LIMIT 500 is always enforced automatically, even if your query doesn\'t include one.\n\n' +
         'Table schema (properties):\n' +
@@ -158,9 +160,24 @@ function registerTools(server: McpServer) {
         '  prior_transfer_date date, prior_price numeric, prior_seller text, prior_buyer text,\n' +
         '  spread_amount numeric, spread_pct numeric, days_held integer,\n' +
         '  status text (filter to status = \'complete\' for rows with a real spread to analyze),\n' +
-        '  created_at timestamptz, updated_at timestamptz.\n\n' +
+        '  created_at timestamptz, updated_at timestamptz,\n' +
+        '  apn text (PropertyRadar format, e.g. 157-791-64-00), apn_digits text (digits only; matches MLS ParcelNumber),\n' +
+        '  -- MLS resale metrics (the flipper\'s renovated listing; relists within 30 days are merged into one timeline):\n' +
+        '  days_on_market integer, dom_source text (\'cumulative\' = MLS CumulativeDaysOnMarket, \'computed\' = OnMarketDate->PurchaseContractDate),\n' +
+        '  mls_cdom integer, dom_computed integer, mls_highest_list_price numeric (max OriginalListPrice in the chain),\n' +
+        '  mls_close_price numeric, list_to_sold_ratio numeric (close / highest list, e.g. 0.9812),\n' +
+        '  mls_listing_count integer (1 = no relist), mls_listing_keys text[], mls_first_on_market date,\n' +
+        '  mls_contract_date date, mls_close_date date,\n' +
+        '  mls_status text (filter to mls_status = \'matched\' for rows with MLS metrics), mls_checked_at timestamptz.\n\n' +
+        'Table schema (mls_listings) — raw MLS records per property, including ones NOT merged into the chain; join on radar_id:\n' +
+        '  radar_id text, listing_key text, listing_id text, parcel_number text, standard_status text,\n' +
+        '  on_market_date date, off_market_date date, purchase_contract_date date, close_date date,\n' +
+        '  original_list_price numeric, list_price numeric, close_price numeric,\n' +
+        '  cumulative_days_on_market integer, days_on_market integer (these two are the MLS\'s own per-listing counts, NOT our DOM),\n' +
+        '  in_chain boolean (true = merged into the resale timeline), raw jsonb, fetched_at timestamptz.\n\n' +
         'Postgres has built-in corr(x, y) for correlation and width_bucket() for threshold/bucket analysis — ' +
-        'both work well for questions like "does sqft or bedroom count correlate more with spread_pct" or ' +
+        'both work well for questions like "does sqft or bedroom count correlate more with spread_pct", ' +
+        '"does list_to_sold_ratio drop when days_on_market is long", or ' +
         '"is there a sqft threshold with notably better ROI".'
       ),
     },

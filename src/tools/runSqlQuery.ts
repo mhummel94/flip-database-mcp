@@ -2,7 +2,8 @@ import { Pool } from 'pg';
 
 // Uses a DIRECT Postgres connection (not the Supabase JS client, which
 // can't run arbitrary SQL) — authenticated as the `flip_readonly` role
-// created in schema.sql, which has ONLY SELECT on `properties` and
+// created in schema.sql (+ migration 001), which has ONLY SELECT on `properties`
+// and `mls_listings` and
 // nothing else. That database-level restriction is the real safety net;
 // everything below is a second, defense-in-depth layer on top of it.
 

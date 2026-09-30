@@ -7,6 +7,8 @@ export interface SearchFilters {
   maxDaysHeld?: number;
   minLatestPrice?: number;
   maxLatestPrice?: number;
+  maxDaysOnMarket?: number;
+  minListToSoldRatio?: number;
   limit?: number;
 }
 
@@ -22,6 +24,8 @@ export async function searchFlipDatabase(filters: SearchFilters) {
   if (filters.maxDaysHeld !== undefined) query = query.lte('days_held', filters.maxDaysHeld);
   if (filters.minLatestPrice !== undefined) query = query.gte('latest_price', filters.minLatestPrice);
   if (filters.maxLatestPrice !== undefined) query = query.lte('latest_price', filters.maxLatestPrice);
+  if (filters.maxDaysOnMarket !== undefined) query = query.lte('days_on_market', filters.maxDaysOnMarket);
+  if (filters.minListToSoldRatio !== undefined) query = query.gte('list_to_sold_ratio', filters.minListToSoldRatio);
 
   query = query.order('spread_pct', { ascending: false }).limit(filters.limit ?? 25);
 
